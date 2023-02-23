@@ -1,0 +1,107 @@
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+public class java_weatherV1 {
+    private static final String WEATHER_API_KEY = "8dab92605bcc242bae8de56bc8cd5e60";
+
+    public static void main(String[] args) {
+        try {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+            System.out.print("Enter location: ");
+            String location = reader.readLine().trim();
+            System.out.print("Enter date (YYYY-MM-DD): ");
+            String dateString = reader.readLine().trim();
+            System.out.print("Enter time (HH:mm): ");
+            String timeString = reader.readLine().trim();
+            reader.close();
+
+            LocalDateTime dateTime = LocalDateTime.parse(dateString + "T" + timeString + ":00");
+
+            int cloudiness = getCloudForecast(location, dateTime);
+            System.out.println("Cloudiness at " + dateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) + ": " + cloudiness + "%");
+
+            int rainProbability = getRainForecast(location, dateTime);
+            System.out.println("Rain probability at " + dateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) + ": " + rainProbability + "%");
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    private static int getCloudForecast(String location, LocalDateTime dateTime) throws Exception {
+        String apiUrl = "https://api.openweathermap.org/data/2.5/forecast?q=" + location + "&appid=" + WEATHER_API_KEY + "&units=metric";
+        URL url = new URL(apiUrl);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+        String line;
+        StringBuilder responseBuilder = new StringBuilder();
+        while ((line = reader.readLine()) != null) {
+            responseBuilder.append(line);
+        }
+        reader.close();
+        conn.disconnect();
+
+        JSONObject response = new JSONObject(responseBuilder.toString());
+        JSONArray forecasts = response.getJSONArray("list");
+
+        long minTimeDelta = Long.MAX_VALUE;
+        int cloudiness = -1;
+
+        for (int i = 0; i < forecasts.length(); i++) {
+            JSONObject forecast = forecasts.getJSONObject(i);
+            long forecastTime = forecast.getLong("dt");
+            LocalDateTime forecastDateTime = LocalDateTime.ofEpochSecond(forecastTime, 0, ZoneOffset.UTC);
+            long timeDelta = Math.abs(dateTime.toEpochSecond(ZoneOffset.UTC) - forecastDateTime.toEpochSecond(ZoneOffset.UTC));
+            if (timeDelta < minTimeDelta) {
+                minTimeDelta = timeDelta;
+                cloudiness = forecast.getJSONObject("clouds").getInt("all");
+            }
+        }
+
+        return cloudiness;
+    }
+
+    private static int getRainForecast(String location, LocalDateTime dateTime) throws Exception {
+        String apiUrl = "https://api.openweathermap.org/data/2.5/forecast?q=" + location + "&appid=" + WEATHER_API_KEY + "&units=metric";
+        URL url = new URL(apiUrl);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+        String line;
+        StringBuilder responseBuilder = new StringBuilder();
+        while ((line = reader.readLine()) != null) {
+            responseBuilder.append(line);
+        }
+        reader.close();
+        conn.disconnect();
+    
+        JSONObject response = new JSONObject(responseBuilder.toString());
+        JSONArray forecasts = response.getJSONArray("list");
+    
+        long minTimeDelta = Long.MAX_VALUE;
+        int rainProbability = -1;
+    
+        for (int i = 0; i < forecasts.length(); i++) {
+            JSONObject forecast = forecasts.getJSONObject(i);
+            long forecastTime = forecast.getLong("dt");
+            LocalDateTime forecastDateTime = LocalDateTime.ofEpochSecond(forecastTime, 0, ZoneOffset.UTC);
+            long timeDelta = Math.abs(dateTime.toEpochSecond(ZoneOffset.UTC) - forecastDateTime.toEpochSecond(ZoneOffset.UTC));
+            if (timeDelta < minTimeDelta) {
+                minTimeDelta = timeDelta;
+                JSONObject rainObject = forecast.optJSONObject("rain");
+                if (rainObject != null) {
+                    rainProbability = rainObject.getInt("3h");
+                }
+            }
+        }
+    
+        return rainProbability;
+    }
+}    
